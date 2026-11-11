@@ -1,0 +1,16 @@
+.secrets/
+.bin/
+.tools/
+.playwright/
+.npm-cache/
+.pnpm-store/
+.home/
+node_modules/
+web/dist/
+tests/node_modules/
+infra/backups/
+infra/secrets/
+.env
+*.log
+.DS_Store
+demo/

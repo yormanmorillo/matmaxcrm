@@ -1,0 +1,15 @@
+{
+  "name": "matmax-crm-e2e",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "smoke": "node ui-smoke.mjs",
+    "crud": "node ui-crud.mjs",
+    "modules": "node ui-modules.mjs",
+    "permissions": "node ui-permissions.mjs",
+    "team": "node ui-team.mjs"
+  },
+  "devDependencies": {
+    "playwright": "1.65.0"
+  }
+}

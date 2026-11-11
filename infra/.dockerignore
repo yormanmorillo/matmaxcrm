@@ -1,0 +1,6 @@
+.env
+secrets/
+backups/
+web/node_modules/
+web/.git/
+**/*.log

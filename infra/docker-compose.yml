@@ -1,0 +1,173 @@
+name: matmax-crm
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  db:
+    image: mariadb:11.8.9
+    container_name: matmax-db
+    restart: unless-stopped
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --innodb-buffer-pool-size=256M
+      - --innodb-log-file-size=64M
+      - --max-connections=50
+      - --table-open-cache=400
+      - --performance-schema=OFF
+      - --skip-name-resolve
+    environment:
+      TZ: ${TZ}
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MARIADB_DATABASE: ${DB_NAME}
+      MARIADB_USER: ${DB_USER}
+      MARIADB_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - db-data:/var/lib/mysql
+    networks:
+      - db
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 20s
+      start_period: 20s
+      timeout: 10s
+      retries: 5
+    mem_limit: 512m
+    memswap_limit: 768m
+    stop_grace_period: 30s
+    logging: *default-logging
+
+  espocrm:
+    image: espocrm/espocrm:10.0.12-fpm
+    container_name: matmax-app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ESPOCRM_DATABASE_PLATFORM: Mysql
+      ESPOCRM_DATABASE_HOST: db
+      ESPOCRM_DATABASE_NAME: ${DB_NAME}
+      ESPOCRM_DATABASE_USER: ${DB_USER}
+      ESPOCRM_DATABASE_PASSWORD: ${DB_PASSWORD}
+      ESPOCRM_ADMIN_USERNAME: ${ADMIN_USERNAME}
+      ESPOCRM_ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      ESPOCRM_SITE_URL: ${SITE_URL}
+      ESPOCRM_TIME_ZONE: ${TZ}
+      ESPOCRM_LANGUAGE: es_ES
+      ESPOCRM_DEFAULT_CURRENCY: EUR
+      ESPOCRM_DATE_FORMAT: DD/MM/YYYY
+      ESPOCRM_TIME_FORMAT: HH:mm
+      ESPOCRM_WEEK_START: "1"
+      ESPOCRM_THOUSAND_SEPARATOR: "."
+      ESPOCRM_DECIMAL_MARK: ","
+      ESPOCRM_CONFIG_USE_WEB_SOCKET: "false"
+      ESPOCRM_CONFIG_LOGGER__LEVEL: WARNING
+      TZ: ${TZ}
+    volumes:
+      - espocrm-data:/var/www/html/data
+      - espocrm-custom:/var/www/html/custom
+      - espocrm-custom-client:/var/www/html/client/custom
+      - ./php/zz-matmax.ini:/usr/local/etc/php/conf.d/zz-matmax.ini:ro
+      - ./php/zz-matmax-fpm.conf:/usr/local/etc/php-fpm.d/zz-matmax.conf:ro
+    networks:
+      - edge
+      - db
+    healthcheck:
+      test: ["CMD", "bin/command", "app-check"]
+      start_period: 90s
+      interval: 60s
+      timeout: 25s
+      retries: 5
+    mem_limit: 768m
+    memswap_limit: 1g
+    logging: *default-logging
+
+  daemon:
+    image: espocrm/espocrm:10.0.12-fpm
+    container_name: matmax-daemon
+    restart: unless-stopped
+    depends_on:
+      espocrm:
+        condition: service_healthy
+    entrypoint: docker-daemon.sh
+    environment:
+      ESPOCRM_SITE_URL: ${SITE_URL}
+      ESPOCRM_TIME_ZONE: ${TZ}
+      TZ: ${TZ}
+    volumes:
+      - espocrm-data:/var/www/html/data
+      - espocrm-custom:/var/www/html/custom
+      - espocrm-custom-client:/var/www/html/client/custom
+      - ./php/zz-matmax.ini:/usr/local/etc/php/conf.d/zz-matmax.ini:ro
+    networks:
+      - edge
+      - db
+    healthcheck:
+      test: ["CMD", "bin/command", "app-check"]
+      start_period: 60s
+      interval: 180s
+      timeout: 25s
+      retries: 3
+    mem_limit: 256m
+    memswap_limit: 384m
+    logging: *default-logging
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/web/Dockerfile
+      args:
+        ESPOCRM_VERSION: "10.0.12"
+    image: matmax-web:10.0.12
+    container_name: matmax-web
+    restart: unless-stopped
+    depends_on:
+      espocrm:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8090:8080"   # SPA MATMAX (Caddy -> aquí)
+      - "127.0.0.1:8091:8081"   # UI nativa EspoCRM (solo loopback / admin.crm)
+    volumes:
+      - ./web/dist:/usr/share/nginx/html:ro
+      - ./nginx/spa.conf:/etc/nginx/conf.d/spa.conf:ro
+      - ./nginx/native.conf:/etc/nginx/conf.d/native.conf:ro
+      - ./custom/client/res/templates/site/footer.tpl:/var/www/html/client/res/templates/site/footer.tpl:ro
+      - ./custom/client/img/logo-light.svg:/var/www/html/client/img/logo-light.svg:ro
+      - ./custom/client/img/logo-lite.svg:/var/www/html/client/img/logo-lite.svg:ro
+      - ./custom/client/img/logo.svg:/var/www/html/client/img/logo.svg:ro
+      - ./custom/client/img/favicon.svg:/var/www/html/client/img/favicon.svg:ro
+      - ./custom/client/img/favicon.ico:/var/www/html/client/img/favicon.ico:ro
+      - ./custom/client/img/favicon-196.png:/var/www/html/client/img/favicon-196.png:ro
+      - ./custom/client/img/logo.png:/var/www/html/client/img/logo.png:ro
+      - ./custom/client/img/logo-33.png:/var/www/html/client/img/logo-33.png:ro
+      - ./custom/client/img/logo-37.png:/var/www/html/client/img/logo-37.png:ro
+      - ./custom/client/img/logo-39.png:/var/www/html/client/img/logo-39.png:ro
+      - espocrm-custom-client:/var/www/html/client/custom:ro
+    networks:
+      - edge
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
+      start_period: 10s
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    mem_limit: 128m
+    memswap_limit: 256m
+    logging: *default-logging
+
+volumes:
+  db-data:
+  espocrm-data:
+  espocrm-custom:
+  espocrm-custom-client:
+
+networks:
+  edge:
+    driver: bridge
+  db:
+    driver: bridge

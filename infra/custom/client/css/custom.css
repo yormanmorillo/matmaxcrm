@@ -1,0 +1,4 @@
+/* MATMAX: oculta el acceso visible a la página legal "Acerca" (sigue accesible por #About). */
+a[href="#About"] {
+    display: none !important;
+}

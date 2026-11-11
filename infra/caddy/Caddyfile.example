@@ -1,0 +1,35 @@
+# Configuración Caddy de referencia para MATMAX CRM.
+# En el servidor actual, este contenido está integrado en /etc/caddy/Caddyfile
+# junto con el bloque preexistente de desk.matmax.site.
+#
+# DNS necesario:
+#   crm.matmax.site       A  185.176.254.121
+#   admin.crm.matmax.site A  185.176.254.121
+
+crm.matmax.site {
+    encode zstd gzip
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        -Server
+    }
+    reverse_proxy 127.0.0.1:8090
+}
+
+admin.crm.matmax.site {
+    encode zstd gzip
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        -Server
+    }
+    reverse_proxy 127.0.0.1:8091
+}
+
+# Acceso temporal a la administración nativa mientras no exista el DNS admin.
+crm.matmax.site:8443 {
+    encode zstd gzip
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        -Server
+    }
+    reverse_proxy 127.0.0.1:8091
+}
